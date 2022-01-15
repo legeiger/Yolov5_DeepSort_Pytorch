@@ -9,6 +9,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 import sys
 sys.path.insert(0, './yolov5')
 
+
 import argparse
 import os
 import platform
@@ -30,11 +31,16 @@ from yolov5.utils.plots import Annotator, colors
 from deep_sort.utils.parser import get_config
 from deep_sort.deep_sort import DeepSort
 
+
 FILE = Path(__file__).resolve()
+
+## maybe we can leave this blank for our needs as we only use custom output folders and project names..
 ROOT = FILE.parents[0]  # yolov5 deepsort root directory
+ROOT = '/workspace/Yolov5_DeepSort_Pytorch' # yolov5 deepsort root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+# ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+print(ROOT)
 
 
 def detect(opt):
@@ -224,6 +230,14 @@ def detect(opt):
             os.system('open ' + save_path)
 
 
+def external_det(opt):
+    print("got opt obj", opt)
+    # make this non blocking for fastapi
+    with torch.no_grad():
+        detect(opt)
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--yolo_model', nargs='+', type=str, default='yolov5m.pt', help='model.pt path(s)')
@@ -253,6 +267,8 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
-
+    # print(opt.imgsz, opt.name, opt.project, opt.save_vid, opt.evaluate, opt.classes)
     with torch.no_grad():
         detect(opt)
+
+
