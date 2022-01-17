@@ -204,11 +204,11 @@ def detect(opt):
                             bbox_h = output[3] - output[1]
                             # append elements to id dict
                             if id not in json_dict.keys():  # we start a 0 to count
-                                new_id_framedata = dict(id = id, frame=dict(frame=frame_idx, classname=names[c], confidence=conf,
+                                new_id_framedata = dict(id = int(id), frame=dict(frame=int(frame_idx), classname=names[c], confidence=int(conf),
                                                         x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h))
                                 json_dict.update(new_id_framedata)
                             else: ## id already exsits → append new data to this old data
-                                new_framedata = dict(frame=frame_idx, classname=names[c], confidence=conf,
+                                new_framedata = dict(frame=int(frame_idx), classname=names[c], confidence=int(conf),
                                                     x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h)
                                 json_dict[id] = json_dict[frame_idx]["frame"].update(new_framedata)
                 
