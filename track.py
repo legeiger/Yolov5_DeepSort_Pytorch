@@ -66,11 +66,11 @@ def detect(opt):
 
     # The MOT16 evaluation runs multiple inference streams in parallel, each one writing to
     # its own .txt file. Hence, in that case, the output folder is not restored
-    if not evaluate:
-        if os.path.exists(out):
-            pass
-            shutil.rmtree(out)  # delete output folder
-        os.makedirs(out)  # make new output folder
+    # if not evaluate:
+    #     if os.path.exists(out):
+    #         pass
+    #         shutil.rmtree(out)  # delete output folder
+    #     os.makedirs(out)  # make new output folder
 
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
@@ -108,7 +108,8 @@ def detect(opt):
     names = model.module.names if hasattr(model, 'module') else model.names
 
     # extract what is in between the last '/' and last '.'
-    txt_file_name = source.split('/')[-1].split('.')[0]
+    txt_file_name = source.split('/')[-1].split('.')[0] + '_det'
+    video_save_path = str(Path(save_dir)) + '/' + txt_file_name + '.mp4'
     txt_path = str(Path(save_dir)) + '/' + txt_file_name + '.txt'
     json_path = str(Path(save_dir)) + '/' + txt_file_name + '.json'
     json_dict: dict = {}
@@ -148,6 +149,7 @@ def detect(opt):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
+            save_path = video_save_path
             s += '%gx%g ' % img.shape[2:]  # print string
 
             annotator = Annotator(im0, line_width=1, pil=not ascii)
@@ -203,14 +205,18 @@ def detect(opt):
                             bbox_w = output[2] - output[0]
                             bbox_h = output[3] - output[1]
                             # append elements to id dict
-                            if id not in json_dict.keys():  # we start a 0 to count
-                                new_id_framedata = dict(id = int(id), frame=dict(frame=int(frame_idx), classname=names[c], confidence=int(conf),
-                                                        x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h))
-                                json_dict.update(new_id_framedata)
-                            else: ## id already exsits → append new data to this old data
-                                new_framedata = dict(frame=int(frame_idx), classname=names[c], confidence=int(conf),
-                                                    x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h)
-                                json_dict[id] = json_dict[frame_idx]["frame"].update(new_framedata)
+                            # appending does not work! read back old data and then add
+                            if id not in json_dict.keys():  # we start a 0 to count # check if this id is already in dict
+                                # if not create a new obj with this info
+                                new_id_obj = { int(id): [dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=int(conf), \
+                                                        x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h)) ] }
+                                              
+                                json_dict.update(new_id_obj)
+                            else: ## id already exsits → append new data to this old data                                
+                                new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=int(conf),
+                                                        x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h))
+                                # append to the created list  
+                                json_dict[id].append(new_framedict)
                 
                 LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), DeepSort:({t5 - t4:.3f}s)')
 
