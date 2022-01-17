@@ -16,6 +16,7 @@ import platform
 import shutil
 import time
 from pathlib import Path
+import json
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
@@ -44,9 +45,9 @@ print(ROOT)
 
 
 def detect(opt):
-    out, source, yolo_model, deep_sort_model, show_vid, save_vid, save_txt, imgsz, evaluate, half, project, name, exist_ok= \
+    out, source, yolo_model, deep_sort_model, show_vid, save_vid, save_txt, save_json, imgsz, evaluate, half, project, name, exist_ok= \
         opt.output, opt.source, opt.yolo_model, opt.deep_sort_model, opt.show_vid, opt.save_vid, \
-        opt.save_txt, opt.imgsz, opt.evaluate, opt.half, opt.project, opt.name, opt.exist_ok
+        opt.save_txt, opt.save_json, opt.imgsz, opt.evaluate, opt.half, opt.project, opt.name, opt.exist_ok
     webcam = source == '0' or source.startswith(
         'rtsp') or source.startswith('http') or source.endswith('.txt')
 
@@ -109,12 +110,15 @@ def detect(opt):
     # extract what is in between the last '/' and last '.'
     txt_file_name = source.split('/')[-1].split('.')[0]
     txt_path = str(Path(save_dir)) + '/' + txt_file_name + '.txt'
+    json_path = str(Path(save_dir)) + '/' + txt_file_name + '.json'
+    json_dict: dict = {}
 
     if pt and device.type != 'cpu':
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.model.parameters())))  # warmup
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
     for frame_idx, (path, img, im0s, vid_cap, s) in enumerate(dataset):
         t1 = time_sync()
+        ## add ignored polys here
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -190,7 +194,24 @@ def detect(opt):
                             with open(txt_path, 'a') as f:
                                 f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
                                                                bbox_top, bbox_w, bbox_h, -1, -1, -1, -1))
-
+                        if save_json:
+                            # to "own" dict which will be saved to disk with more info
+                            # maybe open json from save before?
+                            # dict append ?
+                            bbox_left = output[0]
+                            bbox_top = output[1]
+                            bbox_w = output[2] - output[0]
+                            bbox_h = output[3] - output[1]
+                            # append elements to id dict
+                            if id not in json_dict.keys():  # we start a 0 to count
+                                new_id_framedata = dict(id = id, frame=dict(frame=frame_idx, classname=names[c], confidence=conf,
+                                                        x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h))
+                                json_dict.update(new_id_framedata)
+                            else: ## id already exsits → append new data to this old data
+                                new_framedata = dict(frame=frame_idx, classname=names[c], confidence=conf,
+                                                    x=bbox_left, y=bbox_top, w=bbox_w, h=bbox_h)
+                                json_dict[id] = json_dict[frame_idx]["frame"].update(new_framedata)
+                
                 LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), DeepSort:({t5 - t4:.3f}s)')
 
             else:
@@ -219,6 +240,11 @@ def detect(opt):
 
                     vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                 vid_writer.write(im0)
+
+
+    # dump json_dict
+    with open(json_path, 'w', encoding='utf-8') as file:
+        json.dump(json_dict, file, indent=4)
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
