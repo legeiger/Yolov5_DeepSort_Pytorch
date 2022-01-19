@@ -1,4 +1,5 @@
 # limit the number of cpus used by high performance libraries
+from copyreg import pickle
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -17,6 +18,8 @@ import shutil
 import time
 from pathlib import Path
 import json
+import pickle
+
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
@@ -109,9 +112,10 @@ def detect(opt):
 
     # extract what is in between the last '/' and last '.'
     txt_file_name = source.split('/')[-1].split('.')[0] + '_det'
-    video_save_path = str(Path(save_dir)) + '/' + txt_file_name + '.mp4'
+    video_save_path = str(Path(save_dir)) + '/' + txt_file_name + '.webm'
     txt_path = str(Path(save_dir)) + '/' + txt_file_name + '.txt'
     json_path = str(Path(save_dir)) + '/' + txt_file_name + '.json'
+    pickle_path = str(Path(save_dir)) + '/' + txt_file_name + '.pickel'
     json_dict: dict = {}
 
     if pt and device.type != 'cpu':
@@ -208,17 +212,18 @@ def detect(opt):
                             # appending does not work! read back old data and then add
                             if id not in json_dict.keys():  # we start a 0 to count # check if this id is already in dict
                                 # if not create a new obj with this info
-                                new_id_obj = { int(id): [dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=int(conf), \
+                                new_id_obj = { int(id): [dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2), \
                                                         x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h)) ] }
                                               
                                 json_dict.update(new_id_obj)
                             else: ## id already exsits → append new data to this old data                                
-                                new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=int(conf),
+                                new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2),
                                                         x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h))
                                 # append to the created list  
                                 json_dict[id].append(new_framedict)
                 
                 LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), DeepSort:({t5 - t4:.3f}s)')
+                
 
             else:
                 deepsort.increment_ages()
@@ -244,13 +249,18 @@ def detect(opt):
                     else:  # stream
                         fps, w, h = 30, im0.shape[1], im0.shape[0]
 
-                    vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    # vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'vp80'), fps, (w, h))
                 vid_writer.write(im0)
 
 
     # dump json_dict
     with open(json_path, 'w', encoding='utf-8') as file:
         json.dump(json_dict, file, indent=4)
+
+    #save to pickel file
+    with open(pickle_path, 'wb') as handle:
+        pickle.dump(json_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
