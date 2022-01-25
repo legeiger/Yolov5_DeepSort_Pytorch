@@ -212,7 +212,7 @@ def detect(opt):
                             new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2),
                                                     x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h))
                             # append to the created list  
-                            json_dict[id].append(new_framedict)
+                            json_dict[int(id)].append(new_framedict)
                 
                 LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), DeepSort:({t5 - t4:.3f}s)')
                 
