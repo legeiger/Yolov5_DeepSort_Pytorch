@@ -1,4 +1,5 @@
 # limit the number of cpus used by high performance libraries
+from collections import defaultdict
 from copyreg import pickle
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -116,7 +117,7 @@ def detect(opt):
     txt_path = str(Path(save_dir)) + '/' + txt_file_name + '.txt'
     json_path = str(Path(save_dir)) + '/' + txt_file_name + '.json'
     pickle_path = str(Path(save_dir)) + '/' + txt_file_name + '.pickel'
-    json_dict: dict = {}
+    json_dict: defaultdict = defaultdict(list)
 
     if pt and device.type != 'cpu':
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.model.parameters())))  # warmup
@@ -202,25 +203,16 @@ def detect(opt):
                                                                bbox_top, bbox_w, bbox_h, -1, -1, -1, -1))
                         if save_json:
                             # to "own" dict which will be saved to disk with more info
-                            # maybe open json from save before?
-                            # dict append ?
                             bbox_left = output[0]
                             bbox_top = output[1]
                             bbox_w = output[2] - output[0]
                             bbox_h = output[3] - output[1]
                             # append elements to id dict
-                            # appending does not work! read back old data and then add
-                            if id not in json_dict.keys():  # we start a 0 to count # check if this id is already in dict
-                                # if not create a new obj with this info
-                                new_id_obj = { int(id): [dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2), \
-                                                        x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h)) ] }
-                                              
-                                json_dict.update(new_id_obj)
-                            else: ## id already exsits → append new data to this old data                                
-                                new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2),
-                                                        x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h))
-                                # append to the created list  
-                                json_dict[id].append(new_framedict)
+                            # appending this to the defauldict if framekey does not exist                               
+                            new_framedict = dict(framenumber=int(frame_idx), classname=str(names[c]), confidence=round(float(conf), 2),
+                                                    x=int(bbox_left), y=int(bbox_top), w=int(bbox_w), h=int(bbox_h))
+                            # append to the created list  
+                            json_dict[id].append(new_framedict)
                 
                 LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), DeepSort:({t5 - t4:.3f}s)')
                 
